@@ -1,0 +1,64 @@
+# Make the mouse pointer follow the display DPI scale on ALT's Qt 6.11.2.
+#
+# Background: Telegram 7.4.4-alt1 is built against Qt 6.11.2. In a Wayland
+# session with a scaled output (e.g. QT_SCREEN_SCALE_FACTORS=2 / 192 DPI),
+# Qt 6.11.2 keeps the cursor at the unscaled base size (24 px), while Qt 6.12
+# (used by the Arch build) scales it together with the output. Xcursor exposes
+# XCURSOR_SIZE as the base pixel size; Qt multiplies it by the output scale,
+# so giving an explicit, scaled base size makes the pointer match the UI.
+#
+# Derive the scale from the same variables the desktop session already passes
+# in, so it tracks 1x/2x/... automatically. A user-supplied XCURSOR_SIZE always
+# wins (so `AppImage --appimage-add-env XCURSOR_SIZE=48` can override).
+
+if [ -z "${XCURSOR_SIZE:-}" ]; then
+    _cdpi_scale=
+
+    # Highest priority: explicit Qt scale factor (e.g. "2" or "1.5").
+    case "${QT_SCALE_FACTOR:-}" in
+        ''|0|1) ;;
+        *) _cdpi_scale=${QT_SCALE_FACTOR} ;;
+    esac
+
+    # Next: per-screen scale factors, e.g. "2", "eDP-1:2;HDMI-1:1".
+    if [ -z "$_cdpi_scale" ]; then
+        case "${QT_SCREEN_SCALE_FACTORS:-}" in
+            ''|1) ;;
+            *\;*) _cdpi_first=${QT_SCREEN_SCALE_FACTORS%%;*} ; _cdpi_scale=${_cdpi_first##*:} ;;
+            *:*)  _cdpi_scale=${QT_SCREEN_SCALE_FACTORS##*:} ;;
+            *)    _cdpi_scale=${QT_SCREEN_SCALE_FACTORS} ;;
+        esac
+    fi
+
+    # Last resort: Wayland force-DPI (96 DPI == 1x).
+    if [ -z "$_cdpi_scale" ] && [ -n "${QT_WAYLAND_FORCE_DPI:-}" ]; then
+        _cdpi_scale=$(( QT_WAYLAND_FORCE_DPI / 96 ))
+    fi
+
+    # Approximate fractional scales to the nearest integer >= 1.
+    # "1.5" -> 2, "1.25" -> 1, using integer arithmetic only (dash-safe).
+    case "$_cdpi_scale" in
+        *.*)
+            _cdpi_whole=${_cdpi_scale%%.*}
+            _cdpi_frac=${_cdpi_scale#*.}
+            _cdpi_frac=${_cdpi_frac%%[!0-9]*}
+            [ -z "$_cdpi_frac" ] && _cdpi_frac=0
+            # Normalize to a 0..99 hundredths value.
+            case "$_cdpi_frac" in
+                ?)  _cdpi_frac=$(( _cdpi_frac * 10 )) ;;   # 1 digit: 5 -> 50
+            esac
+            [ "$_cdpi_frac" -le 99 ] 2>/dev/null || _cdpi_frac=99
+            _cdpi_round=0
+            [ "$_cdpi_frac" -ge 50 ] 2>/dev/null && _cdpi_round=1
+            _cdpi_scale=$(( _cdpi_whole + _cdpi_round ))
+            ;;
+    esac
+    case "$_cdpi_scale" in
+        ''|0|*[!0-9]*) _cdpi_scale=1 ;;
+    esac
+
+    # 24 px is the conventional Xcursor base size; scale it to match the UI.
+    XCURSOR_SIZE=$(( 24 * _cdpi_scale ))
+    export XCURSOR_SIZE
+    unset _cdpi_scale _cdpi_first
+fi

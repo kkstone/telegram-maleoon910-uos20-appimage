@@ -1,0 +1,2 @@
+# The hwaccel deb exceeds GitHub's 100 MB blob limit; track it with Git LFS.
+assets/*.deb filter=lfs diff=lfs merge=lfs -text

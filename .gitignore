@@ -1,0 +1,7 @@
+# local build state
+alt-rootfs/
+.cache-rpms/
+AppDir/
+dist/
+prune.log
+*.zsync

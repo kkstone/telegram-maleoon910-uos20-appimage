@@ -1,0 +1,31 @@
+#!/bin/sh
+# Make GLib's libproxy-backed GIO modules find their runtime backend plugin,
+# which quick-sharun places under lib/libproxy/ rather than lib/ directly.
+# Without this, loading libgiolibproxy.so logs
+# "libpxbackend-1.0.so: cannot open shared object file". TLS itself uses
+# libgiognutls.so and works regardless, but keeping the proxy backend
+# resolvable avoids noisy logs and keeps HTTP proxy autodetection functional.
+case ":${LD_LIBRARY_PATH:-}:" in
+	*":$APPDIR/lib/libproxy:"*) ;;
+	*) LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+$LD_LIBRARY_PATH:}$APPDIR/lib/libproxy" ;;
+esac
+export LD_LIBRARY_PATH
+
+# GnuTLS trust store fix.
+# ALT p11's libgnutls 3.8.13 has /usr/share/ca-certificates/ca-bundle.crt
+# compiled in as its ONLY system trust source, with no env override. On hosts
+# that keep their CA bundle elsewhere (e.g. UOS: /etc/ssl/certs/...) the trust
+# list is empty and WebKit mini-apps report "Unacceptable TLS certificate".
+# tools/patch_gnutls_ca.py rewrites that path to /tmp/tgca-bundle.crt; point it
+# at a real bundle. Prefer the host bundle detected by AppRun (SSL_CERT_FILE,
+# always current), fall back to the copy shipped inside the AppDir.
+_tg_ca=""
+if [ -n "${SSL_CERT_FILE:-}" ] && [ -f "$SSL_CERT_FILE" ]; then
+	_tg_ca="$SSL_CERT_FILE"
+elif [ -f "$APPDIR/share/ca-certificates/ca-bundle.crt" ]; then
+	_tg_ca="$APPDIR/share/ca-certificates/ca-bundle.crt"
+fi
+if [ -n "$_tg_ca" ]; then
+	LC_ALL=C ln -sfn "$_tg_ca" /tmp/tgca-bundle.crt 2>/dev/null || :
+fi
+unset _tg_ca

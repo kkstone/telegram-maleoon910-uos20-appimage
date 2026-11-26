@@ -1,0 +1,18 @@
+#!/bin/sh
+# Prefer PulseAudio for the bundled OpenAL Soft when a Pulse server is present.
+#
+# The AppImage ships libpipewire 1.4.7 (from ALT p11). On hosts with an older
+# PipeWire daemon, or without bundled client.conf data, OpenAL's first probe of
+# the PipeWire backend fails noisily:
+#   pw.conf: can't load config client.conf
+#   ALSOFT: Failed to create PipeWire event context
+#   ALSOFT: Failed to initialize backend "pipewire"
+# It then falls back to Pulse anyway. Skip the failed probe up front while
+# leaving ALSA as a fallback and respecting any explicit user choice.
+
+if [ -z "${ALSOFT_DRIVERS:-}" ]; then
+    _audio_runtime=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
+    if [ -S "$_audio_runtime/pulse/native" ]; then
+        export ALSOFT_DRIVERS=pulse,alsa
+    fi
+fi

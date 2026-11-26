@@ -1,0 +1,25 @@
+#!/bin/sh
+# WebKit media + libsoup public-suffix fixes for the pure-ALT AppImage.
+#
+# 1) GStreamer: ALT rootfs ships gst-plugins-base/bad only. WebKit WebProcess
+#    aborts mini-app audio with "GStreamer element autoaudiosink not found"
+#    because the autodetect (and pulsesink) elements come from gst-plugins-good,
+#    which is not installed in the build rootfs. We ship those two plugins in
+#    lib/gstreamer-1.0; make sure GST_PLUGIN_PATH actually includes that dir.
+case ":${GST_PLUGIN_PATH:-}:" in
+	*":$APPDIR/lib/gstreamer-1.0:"*) ;;
+	*) GST_PLUGIN_PATH="${GST_PLUGIN_PATH:+$GST_PLUGIN_PATH:}$APPDIR/lib/gstreamer-1.0" ;;
+esac
+export GST_PLUGIN_PATH
+# A cached registry from a previous AppImage version may not know about the
+# newly shipped autodetect plugin; force a rescan so autoaudiosink is found.
+GST_REGISTRY_UPDATE=1
+export GST_REGISTRY_UPDATE
+
+# 2) libsoup soup-tld: ALT libpsl 0.21.5 has the public suffix list path
+#    /usr/share/publicsuffix/public_suffix_list.dafsa compiled in and ignores
+#    all env overrides. tools/patch_psl_path.py rewrites it to /tmp/tg-psl.dafsa;
+#    point that at the copy shipped inside the AppDir.
+if [ -f "$APPDIR/share/publicsuffix/public_suffix_list.dafsa" ]; then
+	LC_ALL=C ln -sfn "$APPDIR/share/publicsuffix/public_suffix_list.dafsa" /tmp/tg-psl.dafsa 2>/dev/null || :
+fi
