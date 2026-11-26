@@ -33,19 +33,14 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
       - name: Install host build tools
         run: |
           sudo apt-get update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-            bubblewrap aria2 curl cpio xz-utils zstd file python3
-      - name: Enable unprivileged user namespaces for bwrap
-        run: |
-          # GitHub-hosted runners disable unprivileged userns on some kernels,
-          # which makes "bwrap: setting up uid map: Permission denied". The
-          # build runs as root, so this is best-effort and never fatal.
-          sudo sysctl -w kernel.unprivileged_userns_clone=1 2>/dev/null || true
-          sudo sh -c 'echo 1 > /proc/sys/user/max_user_namespaces' 2>/dev/null || true
-      - name: Bootstrap ALT Linux p11 rootfs + dependencies
+            zstd cpio file python3
+      - name: Bootstrap ALT Linux p11 rootfs from frozen snapshot
         run: sudo env REPO_ROOT="$PWD" sh ./get-dependencies.sh
       - name: Build AppImage with EGL shim
         run: sudo env REPO_ROOT="$PWD" ./tools/alt.sh \

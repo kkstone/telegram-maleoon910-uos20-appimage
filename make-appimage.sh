@@ -34,6 +34,17 @@ mkdir -p "$APPDIR"
 tar -xf /work/sharun+helper-libs-aarch64.tar -C "$APPDIR" sharun dash dash-COPYING 2>/dev/null || true
 chmod +x "$APPDIR"/sharun "$APPDIR"/dash 2>/dev/null || true
 
+# quick-sharun looks for its helper tarball in $TMPDIR. Seed it from the copy
+# shipped in this repo so the build is fully offline (CI runners block some
+# GitHub release downloads; the tarball checksum still gets verified).
+_TMPDIR=${TMPDIR:-/tmp}
+cp /work/sharun+helper-libs-aarch64.tar "$_TMPDIR/sharun+helper-libs-aarch64.tar" 2>/dev/null || :
+# Also seed appimagetool and cross-libc-dlopen so the build needs no network.
+[ -f /work/appimagetool ] && cp /work/appimagetool "$_TMPDIR/appimagetool" 2>/dev/null || :
+chmod +x "$_TMPDIR/appimagetool" 2>/dev/null || :
+[ -f /work/cross-libc-dlopen-aarch64.tar ] && \
+	cp /work/cross-libc-dlopen-aarch64.tar "$_TMPDIR/cross-libc-dlopen-aarch64.tar" 2>/dev/null || :
+
 # Deploy Telegram + only the WebKit2GTK-4.0 ABI. libsoup 2.4 and ICU are
 # pulled in recursively by quick-sharun's ldd closure.
 quick-sharun \
