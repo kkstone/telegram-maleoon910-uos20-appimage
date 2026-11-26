@@ -49,7 +49,11 @@ if [ ! -f "$CACHE/alt-p11-rootfs-minimal-aarch64.tar.xz" ]; then
 	curl -fL --retry 3 -o "$CACHE/alt-p11-rootfs-minimal-aarch64.tar.xz" \
 		"$MIRROR/p11/images/cloud/aarch64/alt-p11-rootfs-minimal-aarch64.tar.xz"
 fi
-tar -xJf "$CACHE/alt-p11-rootfs-minimal-aarch64.tar.xz" -C "$ROOTFS" --no-same-owner
+# Skip device nodes (./dev/null, ./dev/pts/ptmx ...): an unprivileged CI
+# runner cannot mknod. bwrap provides /dev at runtime anyway.
+tar -xJf "$CACHE/alt-p11-rootfs-minimal-aarch64.tar.xz" -C "$ROOTFS" \
+	--no-same-owner --exclude='./dev/*'
+mkdir -p "$ROOTFS/dev/pts" "$ROOTFS/dev/shm" "$ROOTFS/proc" "$ROOTFS/sys" "$ROOTFS/tmp"
 
 echo "Fetching aarch64 + noarch package indexes..."
 echo "---------------------------------------------------------------"
