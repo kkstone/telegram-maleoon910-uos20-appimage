@@ -96,7 +96,14 @@ python3 tools/resolve_alt_deps.py \
 	telegram-desktop libwebkit2gtk4.0 libjavascriptcoregtk4.0 \
 	gst-plugins-good1.0 glib-networking publicsuffix-list-dafsa \
 	> "$RPMS" 2>"$CACHE/resolve.log"
-echo "  $(grep -c '\.rpm$' "$RPMS") RPMs resolved"
+RPM_COUNT=$(grep -c '\.rpm$' "$RPMS" || :)
+echo "  $RPM_COUNT RPMs resolved"
+if [ "${RPM_COUNT:-0}" -lt 50 ]; then
+	echo "ERROR: dependency resolver produced only ${RPM_COUNT:-0} RPMs;" >&2
+	echo "       apt-cache inside bwrap is likely failing. resolve.log:" >&2
+	cat "$CACHE/resolve.log" >&2 || :
+	exit 1
+fi
 
 echo "Downloading RPMs (aria2 multi-connection)..."
 echo "---------------------------------------------------------------"

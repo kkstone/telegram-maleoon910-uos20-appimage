@@ -38,12 +38,18 @@ jobs:
           sudo apt-get update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
             bubblewrap aria2 curl cpio xz-utils zstd file python3
-      - name: Bootstrap ALT Linux p11 rootfs + dependencies
-        run: sh ./get-dependencies.sh
-      - name: Build AppImage with EGL shim
+      - name: Enable unprivileged user namespaces for bwrap
         run: |
-          export REPO_ROOT="$PWD"
-          ./tools/alt.sh sh -c 'export LC_ALL=C; /work/make-appimage.sh'
+          # GitHub-hosted runners disable unprivileged userns on some kernels,
+          # which makes "bwrap: setting up uid map: Permission denied". The
+          # build runs as root, so this is best-effort and never fatal.
+          sudo sysctl -w kernel.unprivileged_userns_clone=1 2>/dev/null || true
+          sudo sh -c 'echo 1 > /proc/sys/user/max_user_namespaces' 2>/dev/null || true
+      - name: Bootstrap ALT Linux p11 rootfs + dependencies
+        run: sudo env REPO_ROOT="$PWD" sh ./get-dependencies.sh
+      - name: Build AppImage with EGL shim
+        run: sudo env REPO_ROOT="$PWD" ./tools/alt.sh \
+          sh -c 'export LC_ALL=C; /work/make-appimage.sh'
       - name: Verify artifact
         run: |
           set -e
