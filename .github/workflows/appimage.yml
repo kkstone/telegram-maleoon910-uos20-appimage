@@ -43,8 +43,8 @@ jobs:
       - name: Bootstrap ALT Linux p11 rootfs from frozen snapshot
         run: sudo env REPO_ROOT="$PWD" sh ./get-dependencies.sh
       - name: Build AppImage with EGL shim
-        run: sudo env REPO_ROOT="$PWD" ./tools/alt.sh \
-          sh -c 'export LC_ALL=C; /work/make-appimage.sh'
+        run: |
+          sudo env REPO_ROOT="$PWD" ./tools/alt.sh /bin/sh -c 'export LC_ALL=C; /work/make-appimage.sh'
       - name: Verify artifact
         run: |
           set -e
