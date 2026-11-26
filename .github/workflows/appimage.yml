@@ -45,6 +45,16 @@ jobs:
       - name: Build AppImage with EGL shim
         run: |
           sudo env REPO_ROOT="$PWD" ./tools/alt.sh /bin/sh -c 'export LC_ALL=C; /work/make-appimage.sh'
+      - name: Collect artifact from chroot build dir
+        run: |
+          set -e
+          mkdir -p dist
+          sudo cp -f alt-rootfs/work/dist/*.AppImage* dist/ 2>/dev/null || {
+            echo "ERROR: no AppImage produced in chroot build dir" >&2
+            ls -la alt-rootfs/work/dist/ 2>/dev/null || true
+            exit 1
+          }
+          sudo chown -R "$(id -u):$(id -g)" dist
       - name: Verify artifact
         run: |
           set -e

@@ -13,14 +13,19 @@ ROOTFS="$BASE/alt-rootfs"
 
 if [ "$(id -u)" = "0" ]; then
   # ---- root mode: chroot (CI-friendly, no user namespace needed) ----
-  mkdir -p "$ROOTFS/work" "$ROOTFS/proc" "$ROOTFS/dev" "$ROOTFS/sys"
-  # Bind mounts are best-effort; if the runner forbids them, chroot still works
-  # for the build as long as /proc and /dev are already usable inside rootfs.
+  mkdir -p "$ROOTFS/proc" "$ROOTFS/dev" "$ROOTFS/sys" "$ROOTFS/work"
+  # GitHub-hosted runners forbid mount --bind (overlayfs). Copy the repo into
+  # the rootfs instead so /work is always present inside the chroot. Skip the
+  # big, irrelevant dirs so this stays cheap.
+  rm -rf "$ROOTFS/work"
+  mkdir -p "$ROOTFS/work"
+  (cd "$BASE" && tar -cf - \
+      --exclude='./.git' --exclude='./alt-rootfs' \
+      --exclude='./dist' --exclude='./AppDir' \
+      . 2>/dev/null) | tar -xf - -C "$ROOTFS/work" 2>/dev/null
   mount --bind /proc "$ROOTFS/proc" 2>/dev/null || :
   mount --bind /dev "$ROOTFS/dev" 2>/dev/null || :
-  mount --bind /sys "$ROOTFS/sys" 2>/dev/null || :
-  mount --bind "$BASE" "$ROOTFS/work" 2>/dev/null || :
-  [ -f /etc/resolv.conf ] && mount --bind /etc/resolv.conf "$ROOTFS/etc/resolv.conf" 2>/dev/null || :
+  [ -f /etc/resolv.conf ] && cp /etc/resolv.conf "$ROOTFS/etc/resolv.conf" 2>/dev/null || :
   exec chroot "$ROOTFS" /bin/sh -c 'cd /work && exec "$@"' sh "$@"
 else
   # ---- unprivileged mode: bubblewrap (local development) ----
