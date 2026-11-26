@@ -79,12 +79,13 @@ jobs:
         run: |
           set -e
           TAG="v${VERSION}"
-          BODY="Telegram ${VERSION} AppImage for UOS20 / aarch64 (Maleoon 910).
-Built from ALT Linux p11, WebKit2GTK-4.0 only.
-
-Hardware acceleration: install the bundled deb first (it provides the ANGLE
-libraries under /opt/telegram/lib that the bundled libEGL shim dlopens):
-  sudo dpkg -i ${TAG}/telegram-desktop-hwaccel_7.4.4-1_arm64.deb"
+          BODY=$(printf '%s\n' \
+            "Telegram ${VERSION} AppImage for UOS20 / aarch64 (Maleoon 910)." \
+            "Built from ALT Linux p11, WebKit2GTK-4.0 only." \
+            "" \
+            "Hardware acceleration: install the bundled deb first" \
+            "(it provides the ANGLE libraries under /opt/telegram/lib that the bundled libEGL shim dlopens):" \
+            "  sudo dpkg -i ${TAG}/telegram-desktop-hwaccel_7.4.4-1_arm64.deb")
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG exists; refreshing assets"
             gh release upload "$TAG" dist/*.AppImage assets/*.deb --clobber
