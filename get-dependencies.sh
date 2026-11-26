@@ -20,12 +20,24 @@ ROOTFS="$REPO_ROOT/alt-rootfs"
 CACHE="$REPO_ROOT/.cache-rpms"
 LISTS="$ROOTFS/var/lib/apt/lists"
 
-echo "Installing host build tools..."
+echo "Checking host build tools..."
 echo "---------------------------------------------------------------"
-if command -v apt-get >/dev/null 2>&1; then
-	apt-get update -qq
-	DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-		bubblewrap aria2 curl cpio xz-utils zstd file python3
+# Only install when something is missing. CI preinstalls these with sudo, so
+# running apt-get again here (as the unprivilegedActions user) would fail on
+# /var/lib/apt/lists/lock. Fall back to apt only when we are root.
+missing=""
+for t in bwrap aria2c curl cpio xz zstd file python3; do
+	command -v "$t" >/dev/null 2>&1 || missing="$missing $t"
+done
+if [ -n "$missing" ]; then
+	if command -v apt-get >/dev/null 2>&1 && [ "$(id -u)" -eq 0 ]; then
+		apt-get update -qq
+		DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+			bubblewrap aria2 curl cpio xz-utils zstd file python3
+	else
+		echo "ERROR: missing host tools:$missing (install them or run as root)" >&2
+		exit 1
+	fi
 fi
 command -v bwrap >/dev/null || { echo "ERROR: bwrap not available" >&2; exit 1; }
 command -v aria2c >/dev/null || { echo "ERROR: aria2c not available" >&2; exit 1; }
