@@ -47,25 +47,28 @@ echo "---------------------------------------------------------------"
 mkdir -p "$ROOTFS" "$CACHE"
 if [ ! -f "$CACHE/alt-p11-rootfs-minimal-aarch64.tar.xz" ]; then
 	curl -fL --retry 3 -o "$CACHE/alt-p11-rootfs-minimal-aarch64.tar.xz" \
-		"$MIRROR/p11/branch/aarch64/base/alt-p11-rootfs-minimal-aarch64.tar.xz"
+		"$MIRROR/p11/images/cloud/aarch64/alt-p11-rootfs-minimal-aarch64.tar.xz"
 fi
 tar -xJf "$CACHE/alt-p11-rootfs-minimal-aarch64.tar.xz" -C "$ROOTFS" --no-same-owner
 
 echo "Fetching aarch64 + noarch package indexes..."
 echo "---------------------------------------------------------------"
 mkdir -p "$LISTS/partial"
-for archdir in aarch64 noarch; do
-	list="$LISTS/ftp.altlinux.org_pub_distributions_ALTLinux_p11_branch_${archdir}_base_pkglist.classic"
-	if [ ! -s "$list" ]; then
-		curl -fL --retry 3 -o "$list" \
-			"$MIRROR/p11/branch/$archdir/base/pkglist.classic"
-	fi
-	rel="$LISTS/ftp.altlinux.org_pub_distributions_ALTLinux_p11_branch_${archdir}_base_release"
-	if [ ! -s "$rel" ]; then
-		curl -fL --retry 3 -o "$rel" \
-			"$MIRROR/p11/branch/$archdir/base/release" || :
-	fi
-done
+	for archdir in aarch64 noarch; do
+		list="$LISTS/ftp.altlinux.org_pub_distributions_ALTLinux_p11_branch_${archdir}_base_pkglist.classic"
+		if [ ! -s "$list" ]; then
+			# Mirror serves pkglist.classic.xz (compressed); apt reads the
+			# uncompressed file, so download to a temp .xz then decompress.
+			curl -fL --retry 3 -o "$CACHE/pkglist-$archdir.classic.xz" \
+				"$MIRROR/p11/branch/$archdir/base/pkglist.classic.xz"
+			xz -dc "$CACHE/pkglist-$archdir.classic.xz" > "$list"
+		fi
+		rel="$LISTS/ftp.altlinux.org_pub_distributions_ALTLinux_p11_branch_${archdir}_base_release"
+		if [ ! -s "$rel" ]; then
+			curl -fL --retry 3 -o "$rel" \
+				"$MIRROR/p11/branch/$archdir/base/release" || :
+		fi
+	done
 
 echo "Resolving ALT dependency closure (Telegram + WebKit2GTK-4.0)..."
 echo "---------------------------------------------------------------"
