@@ -40,6 +40,8 @@ jobs:
           sudo apt-get update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
             zstd cpio file python3
+      - name: Pin detected version for this build
+        run: echo "${{ needs.check.outputs.version }}" > LATEST_VERSION
       - name: Bootstrap ALT Linux p11 rootfs from frozen snapshot
         run: sudo env REPO_ROOT="$PWD" sh ./get-dependencies.sh
       - name: Build AppImage with EGL shim
