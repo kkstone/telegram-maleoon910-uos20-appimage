@@ -55,16 +55,23 @@ jobs:
             exit 1
           }
           sudo chown -R "$(id -u):$(id -g)" dist
-      - name: Verify artifact
+      - name: Repack deb with the freshly built AppImage
         run: |
           set -e
-          ls -lh dist/*.AppImage
+          # The base deb in assets/ carries the ANGLE shim/ICD/launcher/etc.
+          # Replace only /opt/telegram/bin/telegram with this run's AppImage
+          # so users can install a single deb and get the latest Telegram.
+          ./tools/repack-deb.sh "${{ needs.check.outputs.version }}"
+      - name: Verify artifacts
+        run: |
+          set -e
+          ls -lh dist/*.AppImage dist/*.deb
           md5sum shims/libEGL.so.1.1.0
-      - name: Upload artifact
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: AppImage-aarch64
-          path: dist
+          path: dist/*
 
   release:
     name: Publish release
@@ -82,7 +89,7 @@ jobs:
       - name: Verify artifacts present
         run: |
           ls -lh dist/*.AppImage
-          ls -lh assets/*.deb
+          ls -lh dist/*.deb
       - name: Create release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -90,18 +97,21 @@ jobs:
         run: |
           set -e
           TAG="v${VERSION}"
+          PKGVER=$(printf '%s' "$VERSION" | sed 's/-alt[0-9]*$//')
+          DEB="telegram-desktop-hwaccel_${PKGVER}-1_arm64.deb"
           BODY=$(printf '%s\n' \
-            "Telegram ${VERSION} AppImage for UOS20 / aarch64 (Maleoon 910)." \
-            "Built from ALT Linux p11, WebKit2GTK-4.0 only." \
+            "Telegram ${VERSION} for UOS20 / aarch64 (Maleoon 910), built from ALT Linux p11 with WebKit2GTK-4.0 only." \
             "" \
-            "Hardware acceleration: install the bundled deb first" \
-            "(it provides the ANGLE libraries under /opt/telegram/lib that the bundled libEGL shim dlopens):" \
-            "  sudo dpkg -i ${TAG}/telegram-desktop-hwaccel_7.4.4-1_arm64.deb")
+            "Install (single command):" \
+            "  sudo dpkg -i ${DEB}" \
+            "" \
+            "The deb embeds this release's AppImage at /opt/telegram/bin/telegram and ships the ANGLE/Vulkan/Maleoon shim set under /opt/telegram/lib, so no separate AppImage download is needed. Launch Telegram from the application menu or run \`Telegram\`." \
+            "A standalone .AppImage is also attached for users who prefer it; it still needs the deb installed for hardware acceleration.")
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG exists; refreshing assets"
-            gh release upload "$TAG" dist/*.AppImage assets/*.deb --clobber
+            gh release upload "$TAG" dist/*.AppImage dist/*.deb --clobber
           else
-            gh release create "$TAG" dist/*.AppImage assets/*.deb \
+            gh release create "$TAG" dist/*.AppImage dist/*.deb \
               --title "Telegram $VERSION (ALT p11 / wk40 / Maleoon910)" \
               --notes "$BODY"
           fi

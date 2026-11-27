@@ -31,7 +31,28 @@ The AppImage is built with [sharun](https://github.com/VHSgunzo/sharun) and
 [quick-sharun](https://github.com/pkgforge-dev/Anylinux-AppImages/blob/main/useful-tools/quick-sharun.sh).
 It bundles its own libs and needs no FUSE (uruntime) and no container at runtime.
 
-## Hardware acceleration — IMPORTANT
+## Install — one command
+
+Download `telegram-desktop-hwaccel_<version>-1_arm64.deb` from
+[Releases](https://github.com/kkstone/telegram-maleoon910-uos20-appimage/releases/latest)
+and install it:
+
+```sh
+sudo dpkg -i telegram-desktop-hwaccel_<version>-1_arm64.deb
+```
+
+That's all. Each CI build takes the hardware-accel base deb and **replaces
+`/opt/telegram/bin/telegram` inside it with the freshly built AppImage**, then
+publishes the repackaged deb to the Release. The deb therefore bundles both the
+current Telegram AppImage and the ANGLE/Vulkan shim set — no separate AppImage
+download or manual file swapping is needed. After installing, launch Telegram
+from the application menu or run `Telegram`.
+
+A standalone `.AppImage` is attached to every Release as well, for users who
+prefer a portable binary. It still needs the deb installed (for the
+`/opt/telegram/lib` ANGLE libraries) to get hardware acceleration.
+
+### How hardware acceleration works
 
 The AppImage's `lib/libEGL.so.1.1.0` is an **ANGLE shim**, not Mesa's EGL. It
 loads the real ANGLE/Vulkan libraries from the host at runtime:
@@ -44,16 +65,10 @@ egl*() → in-AppImage libEGL.so.1.1.0 (shim)
        → /usr/lib/aarch64-linux-gnu/libhvgr.so  (Maleoon driver, system-provided)
 ```
 
-Therefore **you must install the companion deb before launching the AppImage**:
-
-```sh
-sudo dpkg -i telegram-desktop-hwaccel_7.4.4-1_arm64.deb
-```
-
-The deb is shipped in [`assets/`](assets/) and attached to every GitHub Release.
-It installs the ANGLE libraries under `/opt/telegram/lib` and a `Telegram`
-launcher. It does **not** replace the AppImage — run the AppImage as usual after
-installing the deb.
+The deb installs everything under `/opt/telegram/lib`; the launcher at
+`/usr/local/bin/Telegram` sets up the ANGLE environment and execs the embedded
+AppImage. The base deb lives in [`assets/`](assets/) and is the carrier that the
+workflow repackages on every build.
 
 Requirements: aarch64 + Maleoon 910 GPU + a system `libhvgr.so`. Without these,
 the shim falls back gracefully but hardware acceleration will not work.
@@ -72,7 +87,12 @@ aarch64 + noarch package indexes, resolves the full dependency closure of
 Telegram and WebKit2GTK-4.0, and installs the RPMs. `make-appimage.sh` then
 assembles only the 4.0 WebKit ABI, applies the GnuTLS CA / libpsl public-suffix
 / GStreamer / DPI-cursor / audio fixes, swaps in the EGL shim, and produces the
-AppImage in `dist/`.
+AppImage in `dist/`. Finally, `tools/repack-deb.sh` injects that AppImage into
+the base deb from `assets/` and writes the repackaged deb to `dist/`:
+
+```sh
+./tools/repack-deb.sh "$(cat LATEST_VERSION)"
+```
 
 ## Automated updates
 
@@ -82,9 +102,10 @@ AppImage in `dist/`.
 `telegram-desktop` version in ALT Linux p11, with a fallback to the official
 ALT mirror directory listing when pkgs.org serves a human-verification
 challenge. If the version differs from [`LATEST_VERSION`](LATEST_VERSION), it
-builds a fresh AppImage, publishes it (plus the deb) to a GitHub Release, and
-updates `LATEST_VERSION`. You can also trigger a build manually with
-`workflow_dispatch`.
+builds a fresh AppImage, repacks the hardware-accel deb with that AppImage,
+publishes **both** the repackaged deb and the standalone AppImage to a GitHub
+Release, and updates `LATEST_VERSION`. You can also trigger a build manually
+with `workflow_dispatch`.
 
 ## Credits
 
